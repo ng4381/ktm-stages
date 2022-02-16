@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layouts/main_layout :: head(title = 'KTM - products')}">
+</head>
+<body>
+<nav th:replace="~{layouts/main_layout :: nav}"></nav>
+<div class="container" th:fragment="content">
+
+    <p class="h2">Stages manager</p>
+
+    <form action="#" th:modelAttribute="stagesFormDTO" th:action="@{/stages}" th:object="${stagesFormDTO}"
+          method="post">
+        <div>
+            <table class="table">
+                <thead class="table-dark">
+                <tr>
+                    <th>Asm.Order</th>
+                    <th>Ext.Order</th>
+                    <th>Product</th>
+                    <th>Qty</th>
+                    <th>Done</th>
+                    <th>Stage</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="aor, aorSt:*{assemblyOrderRemains}">
+                    <td th:text="${aor.orderId}">0</td>
+                    <td th:text="${aor.extOrderId}">-</td>
+                    <td th:text="${aor.productName}">-</td>
+                    <td th:text="${aor.qty}">-</td>
+                    <td>
+                        <input class="form-control" type="number"
+                               th:field="*{assemblyOrderRemains[__${aorSt.index}__].qtyDone}"/>
+                    </td>
+                    <td th:text="${aor.stageName}">-</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <button class="btn btn-primary" type="submit" name="action" value="submit">Save</button>
+    </form>
+
+</div>
+</body>
+</html>
