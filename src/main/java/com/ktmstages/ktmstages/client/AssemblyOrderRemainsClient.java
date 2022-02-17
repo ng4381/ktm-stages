@@ -3,9 +3,9 @@ package com.ktmstages.ktmstages.client;
 import com.ktmstages.ktmstages.dto.AssemblyOrderRemainsDTO;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.util.List;
 
@@ -19,7 +19,9 @@ public class AssemblyOrderRemainsClient {
     }
 
     public Flux<AssemblyOrderRemainsDTO> getAssemblyOrderRemainsDTOFlux() {
-        return this.client.get().uri("/orders/stages/remains").accept(MediaType.APPLICATION_JSON)
+        return this.client.get()
+                .uri("/orders/stages/remains")
+                .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .bodyToFlux(AssemblyOrderRemainsDTO.class)
                 .map(assemblyOrderRemainsDTO -> {
@@ -29,11 +31,17 @@ public class AssemblyOrderRemainsClient {
     }
 
     public void sendDataToAssemblyOrderService(List<AssemblyOrderRemainsDTO> assemblyOrderRemains) {
-        this.client.post()
+
+
+        this.client
+                .post()
                 .uri("/orders/stages/remains")
-                .body(Mono.just(assemblyOrderRemains), AssemblyOrderRemainsDTO.class)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(BodyInserters.fromValue(assemblyOrderRemains))
                 .retrieve()
-                .bodyToMono(AssemblyOrderRemainsDTO.class);
+                .bodyToMono(Void.class);
+
+
     }
 
 }

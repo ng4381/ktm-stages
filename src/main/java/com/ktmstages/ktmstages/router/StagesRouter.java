@@ -9,7 +9,10 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.server.*;
 import reactor.core.publisher.Mono;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,8 +30,9 @@ public class StagesRouter {
     @Bean
     public RouterFunction<ServerResponse> route() {
 
-        RequestPredicate route = RequestPredicates.GET("/stages");
-        RequestPredicate routemng = RequestPredicates.POST("/stages");
+        RequestPredicate routeGetStages = RequestPredicates.GET("/stages");
+        RequestPredicate routePostStage = RequestPredicates.POST("/stages");
+        RequestPredicate routeGetHome = RequestPredicates.GET("/home");
 
         List<AssemblyOrderRemainsDTO> remains = remainsClient.getAssemblyOrderRemainsDTOFlux().collectList().block();
         StagesFormDTO stagesFormDTO = new StagesFormDTO();
@@ -37,49 +41,50 @@ public class StagesRouter {
         Map<String, Object> map = Collections.singletonMap("stagesFormDTO", stagesFormDTO);
 
         return RouterFunctions
-                .route(route, request -> {
+                .route(routeGetStages, request -> ServerResponse.ok().render("stages/list", map))
+                .andRoute(routeGetHome, request -> ServerResponse.ok().render("home/view"))
+                .andRoute(routePostStage, request -> {
+                    sendModifiedDataToOrderService(request, remains);
                     return ServerResponse.ok().render("stages/list", map);
-                })
-                .andRoute(routemng, request -> {
-
-                    Mono<MultiValueMap<String, String>> m = request.formData();
-                    m.subscribe(stringStringMultiValueMap -> {
-
-                        List<AssemblyOrderRemainsDTO> remainsDTO = new ArrayList<>();
-
-                        stringStringMultiValueMap.forEach((k, v) -> {
-                            Pattern pattern = Pattern.compile(REGEX_ASSEMBLY_ORDER_REMAINS_INDEX);
-                            Matcher matcher = pattern.matcher(k);
-                            if(matcher.find()) {
-
-                                int index = Integer.valueOf(matcher.group("idx"));
-                                int value = Integer.valueOf(v.get(0));
-
-                                System.out.println("Index: " + index + " Old value: " + remains.get(index) + " New value: " + value);
-
-                                if (value != 0) {
-                                    AssemblyOrderRemainsDTO assemblyOrderRemainsDTO = null;
-                                    try {
-                                        assemblyOrderRemainsDTO = (AssemblyOrderRemainsDTO) remains.get(index).clone();
-                                    } catch (CloneNotSupportedException e) {
-                                        e.printStackTrace();
-                                    }
-                                    remainsDTO.add(assemblyOrderRemainsDTO);
-                                }
-                            }
-                        });
-
-                        remainsDTO.forEach(System.out::println);
-
-                        remainsClient.sendDataToAssemblyOrderService(remainsDTO);
-
-
-                    });
-
-                    return ServerResponse.ok().render("stages/list", map);
-                    //return ServerResponse.ok().render("redirect:/stages", map);
                 });
     }
 
+    private void sendModifiedDataToOrderService(ServerRequest request, List<AssemblyOrderRemainsDTO> remains) {
 
+        Mono<MultiValueMap<String, String>> m = request.formData();
+        m.subscribe(multiValueMap -> {
+
+            List<AssemblyOrderRemainsDTO> remainsDTO = getListOfModifiedStages(multiValueMap, remains);
+            if (!remainsDTO.isEmpty()) {
+                remainsClient.sendDataToAssemblyOrderService(remainsDTO);
+                setValueToDefault(remainsDTO);
+            }
+        });
+    }
+
+    private void setValueToDefault(List<AssemblyOrderRemainsDTO> remainsDTO) {
+        remainsDTO.forEach(assemblyOrderRemainsDTO -> assemblyOrderRemainsDTO.setQtyDone(0));
+    }
+
+    private List<AssemblyOrderRemainsDTO> getListOfModifiedStages(MultiValueMap<String, String> multiValueMap, List<AssemblyOrderRemainsDTO> remains) {
+        List<AssemblyOrderRemainsDTO> remainsDTO = new ArrayList<>();
+
+        multiValueMap.forEach((k, v) -> {
+            Pattern pattern = Pattern.compile(REGEX_ASSEMBLY_ORDER_REMAINS_INDEX);
+            Matcher matcher = pattern.matcher(k);
+            if (matcher.find()) {
+
+                int index = Integer.valueOf(matcher.group("idx"));
+                int value = Integer.valueOf(v.get(0));
+
+                if (value != 0) {
+                    AssemblyOrderRemainsDTO assemblyOrderRemainsDTO = remains.get(index);
+                    assemblyOrderRemainsDTO.setQtyDone(value);
+                    remainsDTO.add(assemblyOrderRemainsDTO);
+                }
+            }
+        });
+
+        return remainsDTO;
+    }
 }

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layouts/main_layout :: head(title = 'KTM - products')}">
+</head>
+<body>
+<nav th:replace="~{layouts/main_layout :: nav}"></nav>
+<div class="container" th:fragment="content">
+
+    <div class="jumbotron py-4">
+        <h1 class="display-4">Welcom to KTM Stage Manager</h1>
+        <p class="lead">This service will help you to manage your assembly orders stages</p>
+        <hr class="my-4">
+        <p>Learn more about this service</p>
+        <p class="lead">
+            <a class="btn btn-primary btn-lg" href="#" role="button">Learn more</a>
+        </p>
+    </div>
+</div>
+</body>
+</html>

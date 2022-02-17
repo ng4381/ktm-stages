@@ -3,7 +3,7 @@ package com.ktmstages.ktmstages.dto;
 import lombok.Data;
 
 @Data
-public class AssemblyOrderRemainsDTO implements Cloneable{
+public class AssemblyOrderRemainsDTO{
 
     private Long orderId;
     private Long extOrderId;
@@ -14,9 +14,4 @@ public class AssemblyOrderRemainsDTO implements Cloneable{
     private int qtyDone;
     private Long stageId;
     private String stageName;
-
-    @Override
-    public Object clone() throws CloneNotSupportedException {
-        return super.clone();
-    }
 }
