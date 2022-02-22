@@ -3,6 +3,8 @@ package com.ktmstages.ktmstages.router;
 import com.ktmstages.ktmstages.client.AssemblyOrderRemainsClient;
 import com.ktmstages.ktmstages.dto.AssemblyOrderRemainsDTO;
 import com.ktmstages.ktmstages.dto.StagesFormDTO;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.MultiValueMap;
@@ -19,13 +21,11 @@ import java.util.regex.Pattern;
 import static com.ktmstages.ktmstages.utils.Constants.REGEX_ASSEMBLY_ORDER_REMAINS_INDEX;
 
 @Configuration
+@RequiredArgsConstructor
+@Slf4j
 public class StagesRouter {
 
-    private AssemblyOrderRemainsClient remainsClient;
-
-    public StagesRouter(AssemblyOrderRemainsClient remainsClient) {
-        this.remainsClient = remainsClient;
-    }
+    private final AssemblyOrderRemainsClient remainsClient;
 
     @Bean
     public RouterFunction<ServerResponse> route() {
@@ -34,22 +34,30 @@ public class StagesRouter {
         RequestPredicate routePostStage = RequestPredicates.POST("/stages");
         RequestPredicate routeGetHome = RequestPredicates.GET("/home");
 
+        Map<String, Object> model = getModel();
+
+        return RouterFunctions
+                .route(routeGetStages, request -> ServerResponse.ok().render("stages/list", model))
+                .andRoute(routeGetHome, request -> ServerResponse.ok().render("home/view"))
+                .andRoute(routePostStage, request -> {
+                    sendModifiedDataToOrderService(request, model);
+                    //return ServerResponse.temporaryRedirect(URI.create("/stages")).build();
+                    return ServerResponse.ok().render("stages/list", model);
+                });
+    }
+
+    private Map<String, Object> getModel() {
+
         List<AssemblyOrderRemainsDTO> remains = remainsClient.getAssemblyOrderRemainsDTOFlux().collectList().block();
         StagesFormDTO stagesFormDTO = new StagesFormDTO();
         stagesFormDTO.setAssemblyOrderRemains(remains);
 
-        Map<String, Object> map = Collections.singletonMap("stagesFormDTO", stagesFormDTO);
-
-        return RouterFunctions
-                .route(routeGetStages, request -> ServerResponse.ok().render("stages/list", map))
-                .andRoute(routeGetHome, request -> ServerResponse.ok().render("home/view"))
-                .andRoute(routePostStage, request -> {
-                    sendModifiedDataToOrderService(request, remains);
-                    return ServerResponse.ok().render("stages/list", map);
-                });
+        return Collections.singletonMap("stagesFormDTO", stagesFormDTO);
     }
 
-    private void sendModifiedDataToOrderService(ServerRequest request, List<AssemblyOrderRemainsDTO> remains) {
+    private void sendModifiedDataToOrderService(ServerRequest request, Map<String, Object> model) {
+
+        List<AssemblyOrderRemainsDTO> remains = ((StagesFormDTO) model.get("stagesFormDTO")).getAssemblyOrderRemains();
 
         Mono<MultiValueMap<String, String>> m = request.formData();
         m.subscribe(multiValueMap -> {
@@ -57,13 +65,8 @@ public class StagesRouter {
             List<AssemblyOrderRemainsDTO> remainsDTO = getListOfModifiedStages(multiValueMap, remains);
             if (!remainsDTO.isEmpty()) {
                 remainsClient.sendDataToAssemblyOrderService(remainsDTO);
-                setValueToDefault(remainsDTO);
             }
         });
-    }
-
-    private void setValueToDefault(List<AssemblyOrderRemainsDTO> remainsDTO) {
-        remainsDTO.forEach(assemblyOrderRemainsDTO -> assemblyOrderRemainsDTO.setQtyDone(0));
     }
 
     private List<AssemblyOrderRemainsDTO> getListOfModifiedStages(MultiValueMap<String, String> multiValueMap, List<AssemblyOrderRemainsDTO> remains) {

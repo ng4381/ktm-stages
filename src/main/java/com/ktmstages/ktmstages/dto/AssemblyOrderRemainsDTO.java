@@ -3,7 +3,7 @@ package com.ktmstages.ktmstages.dto;
 import lombok.Data;
 
 @Data
-public class AssemblyOrderRemainsDTO{
+public class AssemblyOrderRemainsDTO {
 
     private Long orderId;
     private Long extOrderId;
