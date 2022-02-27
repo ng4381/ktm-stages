@@ -8,17 +8,23 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsWebFilter;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.server.*;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.ktmstages.ktmstages.utils.Constants.REGEX_ASSEMBLY_ORDER_REMAINS_INDEX;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.web.reactive.function.BodyExtractors.toMono;
+import static org.springframework.web.reactive.function.server.RequestPredicates.accept;
+import static org.springframework.web.reactive.function.server.RequestPredicates.contentType;
+import static org.springframework.web.reactive.function.server.ServerResponse.ok;
 
 @Configuration
 @RequiredArgsConstructor
@@ -26,30 +32,69 @@ import static com.ktmstages.ktmstages.utils.Constants.REGEX_ASSEMBLY_ORDER_REMAI
 public class StagesRouter {
 
     private final AssemblyOrderRemainsClient remainsClient;
+    private final StagesFormDTO stagesFormDTO;
+
+    @Bean
+    CorsWebFilter corsFilter() {
+
+        CorsConfiguration config = new CorsConfiguration();
+
+        // Possibly...
+        // config.applyPermitDefaultValues()
+
+        config.applyPermitDefaultValues();
+
+        /*
+        config.setAllowCredentials(true);
+        config.addAllowedOrigin("http://localhost:8078");
+        config.addAllowedHeader("*");
+        config.addAllowedMethod("*")
+
+         */
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+
+        return new CorsWebFilter(source);
+    }
 
     @Bean
     public RouterFunction<ServerResponse> route() {
 
         RequestPredicate routeGetStages = RequestPredicates.GET("/stages");
+        RequestPredicate routeGetStagesWeb = RequestPredicates.GET("/web/stages");
+        RequestPredicate routePostStagesWeb = RequestPredicates.POST("/web/stages").and(accept(APPLICATION_JSON)).and(contentType(APPLICATION_JSON));
         RequestPredicate routePostStage = RequestPredicates.POST("/stages");
         RequestPredicate routeGetHome = RequestPredicates.GET("/home");
 
         Map<String, Object> model = getModel();
 
         return RouterFunctions
-                .route(routeGetStages, request -> ServerResponse.ok().render("stages/list", model))
-                .andRoute(routeGetHome, request -> ServerResponse.ok().render("home/view"))
+                .route(routeGetStages, request -> {
+                    return ok().render("stages/list", model);
+                })
+                .andRoute(routeGetStagesWeb, request -> ok()
+                        .body(remainsClient.getAssemblyOrderRemainsDTOFlux(), AssemblyOrderRemainsDTO.class)
+                )
+                .andRoute(routeGetHome, request -> ok().render("home/view"))
                 .andRoute(routePostStage, request -> {
                     sendModifiedDataToOrderService(request, model);
                     //return ServerResponse.temporaryRedirect(URI.create("/stages")).build();
-                    return ServerResponse.ok().render("stages/list", model);
-                });
+                    return ok().render("stages/list", model);
+                })
+                .andRoute(routePostStagesWeb, request -> {
+                    //remainsClient.sendDataToAssemblyOrderService(List.of(""));
+                    return request
+                            .bodyToFlux(AssemblyOrderRemainsDTO.class)
+                            .collectList().map(orderRemainsDTOList -> remainsClient.sendDataToAssemblyOrderService(orderRemainsDTOList))
+                            .then(ok().build());
+        });
     }
 
     private Map<String, Object> getModel() {
 
         List<AssemblyOrderRemainsDTO> remains = remainsClient.getAssemblyOrderRemainsDTOFlux().collectList().block();
-        StagesFormDTO stagesFormDTO = new StagesFormDTO();
+        //StagesFormDTO stagesFormDTO = new StagesFormDTO();
         stagesFormDTO.setAssemblyOrderRemains(remains);
 
         return Collections.singletonMap("stagesFormDTO", stagesFormDTO);
